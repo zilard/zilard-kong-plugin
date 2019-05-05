@@ -1,6 +1,7 @@
 # Table of Contents
 
 - [Task](#Task)
+- [Setup prerequisite environment](#Setup-prerequisite-environment)
 - [Create the Service and set the Plugin](#Create-the-Service-and-set-the-Plugin)
 - [Create Upstreams and Targets](#Create-Upstreams-and-Targets)
 - [Testing](#Testing)
@@ -18,6 +19,195 @@ Requests that match route /local will be proxied to Upstream europe_cluster, exc
 Upstream names are configurable. Header names and values can be hard coded for this exercise.
 
 Extra: Multiple header names and values can be a configurable rule that is matched, for example X-Country=Italy, X-Regione=Abruzzo will go to upstream italy_cluster, but just X-Country=Italy without header X-Regione still goes to europe_cluster
+
+
+
+
+
+# Setup prerequisite environment
+
+Create Docker containers for europe_cluster and italy_cluster:
+
+    ~/NODE$ ls
+    EUROPE_CLUSTER  ITALY_CLUSTER
+
+
+    ~/NODE/EUROPE_CLUSTER$ ls
+    Dockerfile  package.json  server.js
+
+
+    ~/NODE/EUROPE_CLUSTER$ cat Dockerfile 
+    FROM node:8
+
+    # Create app directory
+    WORKDIR /usr/src/app
+
+    # Install app dependencies
+    # A wildcard is used to ensure both package.json AND package-lock.json are copied
+    # where available (npm@5+)
+    COPY package*.json ./
+
+    RUN npm install
+    # If you are building your code for production
+    # RUN npm ci --only=production
+
+    # Bundle app source
+    COPY . .
+
+    EXPOSE 8080
+    CMD [ "npm", "start" ]
+
+
+
+    ~/NODE/EUROPE_CLUSTER$ cat server.js 
+    'use strict';
+
+    const express = require('express');
+
+    // Constants
+    const PORT = 8080;
+    const HOST = '0.0.0.0';
+
+    // App
+    const app = express();
+    app.get('/', (req, res) => {
+      res.send('Hello from EUROPE_CLUSTER\n');
+    });
+
+    app.listen(PORT, HOST);
+    console.log(`EUROPE_CLUSTER Running on http://${HOST}:${PORT}`);
+
+
+
+
+Create italy-cluster web server in Docker container:
+
+    ~/NODE/ITALY_CLUSTER$ cat Dockerfile 
+    FROM node:8
+
+    # Create app directory
+    WORKDIR /usr/src/app
+
+    # Install app dependencies
+    # A wildcard is used to ensure both package.json AND package-lock.json are copied
+    # where available (npm@5+)
+    COPY package*.json ./
+
+    RUN npm install
+    # If you are building your code for production
+    # RUN npm ci --only=production
+
+    # Bundle app source
+    COPY . .
+
+    EXPOSE 8080
+    CMD [ "npm", "start" ]
+
+
+
+    ~/NODE/ITALY_CLUSTER$ cat server.js 
+    'use strict';
+
+    const express = require('express');
+
+    // Constants
+    const PORT = 8080;
+    const HOST = '0.0.0.0';
+
+    // App
+    const app = express();
+    app.get('/', (req, res) => {
+      res.send('Hello from ITALY_CLUSTER\n');
+    });
+
+    app.listen(PORT, HOST);
+    console.log(`ITALY_CLUSTER Running on http://${HOST}:${PORT}`);
+
+
+
+
+Build and run docker containers:
+
+    docker build -t user1/europe-cluster .
+    docker run -p 49161:8080 -d user1/europe-cluster
+
+    docker build -t user1/italy-cluster .
+    docker run -p 49162:8080 -d user1/italy-cluster
+
+
+
+    docker ps -a
+    CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                              NAMES
+    5fdff0bc2ecb        user1/italy-cluster    "npm start"              17 hours ago        Up 17 hours         0.0.0.0:49162->8080/tcp            relaxed_brattain
+    3b4c064d410f        user1/europe-cluster   "npm start"              13 days ago         Up 13 days          0.0.0.0:49161->8080/tcp            vigorous_neumann
+
+
+
+
+
+Check the allocated IP address by Docker:
+
+
+    docker exec -it 3b4c064d410f /bin/bash
+
+    root@3b4c064d410f:/usr/src/app# ip addr show
+
+    125: eth0@if126: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+        link/ether 02:42:ac:11:00:04 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+        inet 172.17.0.4/16 brd 172.17.255.255 scope global eth0
+           valid_lft forever preferred_lft forever
+
+
+
+    docker exec -it 5fdff0bc2ecb /bin/bash
+
+    root@5fdff0bc2ecb:/usr/src/app# ip addr show
+
+    262: eth0@if263: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+       link/ether 02:42:ac:11:00:05 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+       inet 172.17.0.5/16 brd 172.17.255.255 scope global eth0
+          valid_lft forever preferred_lft forever
+
+
+
+
+
+Configure the hosts file for name resolution:
+
+    vi /etc/hosts
+
+    172.17.0.4 europe-cluster
+    172.17.0.5 italy-cluster
+
+
+
+
+
+Test the access to the webservers running in the containers:
+
+    curl -i europe-cluster:8080
+    HTTP/1.1 200 OK
+    X-Powered-By: Express
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 26
+    ETag: W/"1a-7jp7YT2mKQzOL759pZwG39oFcJ0"
+    Date: Sun, 05 May 2019 16:30:37 GMT
+    Connection: keep-alive
+
+    Hello from EUROPE_CLUSTER
+
+
+
+    curl -i italy-cluster:8080
+    HTTP/1.1 200 OK
+    X-Powered-By: Express
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 25
+    ETag: W/"19-t/bYiCrLAVxVPGZFFQwjd+LPRjQ"
+    Date: Sun, 05 May 2019 16:31:04 GMT
+    Connection: keep-alive
+
+    Hello from ITALY_CLUSTER
 
 
 
