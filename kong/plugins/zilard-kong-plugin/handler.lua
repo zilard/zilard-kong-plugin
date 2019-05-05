@@ -19,8 +19,6 @@ local INFO = ngx.INFO
 function plugin:new()
   plugin.super.new(self, plugin_name)
 
-  ngx_log(INFO, "________SZILARD here in plugin => \"", plugin_name)
-
   -- do initialization here, runs in the 'init_by_lua_block', before worker processes are forked
 
 end
@@ -92,33 +90,33 @@ function plugin:access(plugin_conf)
 
   -- Requests that match route /local 
 
-  ngx_log(INFO, "________upstream_name => \"", plugin_conf.upstream_name)
-  kong.log.inspect(plugin_conf.upstream_name)
+  -- ngx_log(INFO, "________upstream_name => \"", plugin_conf.upstream_name)
+  -- kong.log.inspect(plugin_conf.upstream_name)
 
   -- your custom code here
-  ngx.req.set_header("Hello-World", "this is on a request")
-
-
-
+  -- ngx.req.set_header("Hello-World", "this is on a request")
 
 
   local path = kong.request.get_path()
-  local header = kong.request.get_header("X-Country")
+  local header_country = kong.request.get_header("X-Country")
+  local header_region = kong.request.get_header("X-Regione")
 
-  if path == "/local" then
+
+  if path == "/local" or (header_country == "Italy" and header_region == nil) then
       ngx_log(INFO, "!!!!!____EUROPE CLUSTER")
       kong.service.request.set_path("/")
       kong.service.set_upstream("europe-cluster")
-      kong.service.set_target("europe-cluster", 8080)
-  elseif header == "Italy" then
+      -- kong.service.set_target("europe-cluster", 8080)
+  elseif header_country == "Italy" and header_region ~= nil then
       ngx_log(INFO, "!!!!!____ITALY CLUSTER")
       kong.service.set_upstream("italy-cluster")
-      kong.service.set_target("italy-cluster", 8080)
+      -- kong.service.set_target("italy-cluster", 8080)
   end
 
 
   ngx_log(INFO, "____PATH: ", path)
-  ngx_log(INFO, "____HEADER: ", header)
+  ngx_log(INFO, "____HEADER_COUNTRY: ", header_country)
+  ngx_log(INFO, "____HEADER_REGION: ", header_region)
 
 
   -- ngx_log(INFO, "____HOST: ", kong.request.get_host())
@@ -145,8 +143,8 @@ function plugin:header_filter(plugin_conf)
   plugin.super.header_filter(self)
 
   -- your custom code here, for example;
-  ngx.header["Bye-World"] = "this is on the response"
-  ngx.header["SZILARD"] = "!!!!!!!! HERE !!!!!!!!"
+  -- ngx.header["Bye-World"] = "this is on the response"
+  -- ngx.header["SZILARD"] = "!!!!!!!! HERE !!!!!!!!"
 
 end
 
